@@ -1,0 +1,50 @@
+﻿services:
+  hashdiff-db:
+    container_name: hashdiff-db
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -Q "SELECT 1" -b -o /dev/null
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 1s
+    ports:
+      - 1433:1433
+    environment:
+      - ACCEPT_EULA=Y
+      - MYSQL_PASSWORD_FILE=/run/secrets/db_password
+    networks:
+      - dbnetwork
+    volumes:
+      - volSqlServerData:/var/opt/mssql
+    secrets:
+      - db_password
+  hashdiff:
+    image: hashdiff
+    build:
+      context: .
+      dockerfile: HashDiff/Dockerfile
+    ports:
+      - 8001:80
+      - 8443:443
+    depends_on:
+      hashdiff-db:
+        condition: service_healthy
+    environment:
+      - DB_HOST=hashdiff-db
+      - DB_NAME=HashDiffDB
+      - DB_SA_PASSWORD_FILE=/run/secrets/db_password
+      - ASPNETCORE_ENVIRONMENT=Production
+    networks:
+      - dbnetwork
+    secrets:
+      - db_password
+networks:
+  dbnetwork: {}
+    
+volumes:
+  volSqlServerData: {}
+  
+secrets:
+  db_password:
+    file: db_password.txt
